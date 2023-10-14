@@ -1,0 +1,49 @@
+#!/bin/bash
+#  install nodejs
+# https://yum.oracle.com/oracle-linux-nodejs.html#InstallingNodeOnOL8
+# some gotcha on OEL8 - enable apache communication with other - ie, flask
+/usr/sbin/setsebool httpd_can_network_connect true
+systemctl stop firewalld
+
+#  install some basic packets
+echo "Info:  Install some basic packages"
+dnf install git zip mlocate bind-utils net-tools -y
+
+echo "Info: install nodejs"
+dnf module enable nodejs:18 -y
+dnf module install nodejs -y
+echo "Info: install apache"
+dnf install httpd -y
+
+if [ ! -d /tmp/post-scripts ] ; then
+   cd /tmp
+   git clone https://github.com/toaigit/post-scripts.git
+fi
+
+#  simple hello nodej with and without express package
+#  this folder must match the apache configuration file
+#  your userdata will execute the start-nodejs.sh command 
+echo "Info:  Copy the nodjs application"
+cd /tmp/post-scripts
+mkdir /var/www/ExpressJS 
+cp -p nodejs-app.js /var/www/ExpressJS
+cp -p express-app.js /var/www/ExpressJS
+cp -p start-nodejs.sh /var/www/ExpressJS
+chown -R  appadmin:appadmin /var/www/ExpressJS
+mkdir /var/log/nodejs
+chown appadmin:appadmin /var/log/nodejs
+
+#  install express under the appacmin account
+echo "Info: install express as appadmin user"
+su - appadmin -c "cd /var/www/ExpressJS; npm install express"
+
+echo "Info: config httpd ssl"
+#  enable ssl
+dnf install mod_ssl -y
+mkdir -p /etc/httpd/certs
+cp -p nodejs-ssl.conf /etc/httpd/conf.d/ssl.conf
+cp -p server.key /etc/httpd/certs/server.key
+cp -p server.crt /etc/httpd/certs/server.crt
+#cp -p server-chain.crt /etc/httpd/cert/server-chain.crt
+
+echo "Info: install.nodejs script completed."

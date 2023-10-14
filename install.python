@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# some gotcha on OEL8 - enable apache communication with other - ie, flask
+/usr/sbin/setsebool httpd_can_network_connect true
+systemctl stop firewalld
+
+#  install some basic packets
+echo "Info:  Install some basic packages"
+dnf install git zip mlocate bind-utils net-tools -y
+
+#  install python and apache
+dnf install python39 -y
+alternatives --set python3 /usr/bin/python3.9
+dnf install httpd  -y
+dnf install  python39-mod_wsgi -y
+
+#  create python cgi and Flask application folders
+mkdir /var/www/FlaskApp /var/www/python-cgi
+
+#  install Flask App python environment
+cd /var/www/FlaskApp
+python3 -m venv  env/test
+source env/test/bin/activate
+python -m pip install --upgrade pip
+pip install Flask
+
+if [ ! -d /tmp/post-scripts ] ; then
+   cd /tmp
+   git clone https://github.com/toaigit/post-scripts.git
+fi
+
+cd /tmp/post-scripts
+#  enable apache wsgi module for apache
+cp -p 10-wsgi.conf /etc/httpd/conf.modules.d/10-wsgi.conf
+#  simple python cgi script
+cp -p hello.py /var/www/python-cgi/hello.py
+#  simple hello work flask app
+cp -p app.py /var/www/FlaskApp/app.py
+cp -p startup-flask.sh /var/www/FlaskApp
+
+#  change the ownership of the /var/www/FlaskApp owner
+chown -R  appadmin:appadmin /var/www/FlaskApp
+
+#  enable ssl
+dnf install mod_ssl -y
+mkdir -p /etc/httpd/certs
+cp flask-ssl.conf /etc/httpd/conf.d/ssl.conf
+cp -p server.key /etc/httpd/certs/server.key
+cp -p server.crt /etc/httpd/certs/server.crt
+#cp -p server-chain.crt /etc/httpd/cert/server-chain.crt
+
+# end of python installation
